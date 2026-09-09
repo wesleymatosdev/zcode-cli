@@ -12,7 +12,8 @@
 // never widen yolo mode (it only runs when a prompt would show) and cannot
 // override runtime-side explicit deny rules (those never reach a prompt).
 
-import { existsSync, readFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { dirname, join } from "node:path"
 
 import { asString, isRecord } from "./types.ts"
 
@@ -92,9 +93,7 @@ export function builtinAutoPermissionConfig(): AutoPermissionConfig {
   }
 }
 
-export function loadAutoPermissionConfig(configPath: string | undefined): AutoPermissionConfig {
-  const base = builtinAutoPermissionConfig()
-  if (!configPath) return base
+function readConfigFile(configPath: string, base: AutoPermissionConfig): AutoPermissionConfig {
   try {
     if (!existsSync(configPath)) return base
     const parsed: unknown = JSON.parse(readFileSync(configPath, "utf8"))
@@ -122,14 +121,32 @@ export function loadAutoPermissionConfig(configPath: string | undefined): AutoPe
     }
     return {
       defaults: { unmatched },
-      allow: rules("allow"),
-      softDeny: rules("softDeny"),
-      hardDeny: rules("hardDeny")
+      // File rules layer on top of built-ins: learned/custom rules can add
+      // to the base policy, and the built-ins always stay active.
+      allow: [...base.allow, ...rules("allow")],
+      softDeny: [...base.softDeny, ...rules("softDeny")],
+      hardDeny: [...base.hardDeny, ...rules("hardDeny")]
     }
   } catch {
-    // A broken config file must never break the TUI: fall back to built-ins.
+    // A broken config file must never break the TUI: fall back to the input.
     return base
   }
+}
+
+// Load order (later layers add rules on top of earlier ones):
+//   built-ins → <project>/.zcode/auto-permissions.json (learned rules)
+//   → ZCODE_AUTO_PERMISSIONS_CONFIG (explicit user override)
+export function loadAutoPermissionConfig(configPath: string | undefined, projectRoot?: string): AutoPermissionConfig {
+  let config = builtinAutoPermissionConfig()
+  if (projectRoot) config = readConfigFile(learnedPolicyPath(projectRoot), config)
+  if (configPath) config = readConfigFile(configPath, config)
+  return config
+}
+
+// The full layered policy the overlay should evaluate: built-ins + learned
+// file + explicit env override, in one config.
+export function effectiveAutoPermissionConfig(projectRoot: string | undefined, envConfigPath: string | undefined): AutoPermissionConfig {
+  return loadAutoPermissionConfig(envConfigPath, projectRoot)
 }
 
 function commandOf(input: unknown): string {
@@ -193,10 +210,113 @@ export function classifyPermissionRequest(
   }
 }
 
-// The exact response object shape the permission dialog returns to the
-// runtime (see defaultPermissionChoices / requestToolPermission). A null
-// verdict means "no auto decision": the caller renders the human dialog.
-export type PermissionDialogResponse = { decision: "allow" | "deny"; reason: string }
+// ---- learning: mirror "Always allow" dialog answers into the policy file ----
+//
+// The dialog's "Always allow in this project" choice returns the runtime's
+// addRules payload. We mirror it into a project-local policy file
+// (<cwd>/.zcode/auto-permissions.json) so learned rules are portable,
+// diffable, and editable — and feed them back through the same classifier
+// config the overlay already loads.
+
+export interface LearnedRule {
+  tool: string
+  ruleContent?: string
+  behavior: "allow" | "deny"
+}
+
+export function extractLearningRule(response: unknown): LearnedRule | null {
+  if (!isRecord(response)) return null
+  const updates = response.permissionUpdates
+  if (!Array.isArray(updates)) return null
+  for (const update of updates) {
+    if (!isRecord(update) || update.type !== "addRules") continue
+    const rules = update.rules
+    if (!Array.isArray(rules) || rules.length === 0) continue
+    const first = rules.find(isRecord)
+    if (!first) continue
+    const toolName = asString(first.toolName)
+    if (!toolName) continue
+    const ruleContent = asString(first.ruleContent)
+    return {
+      tool: toolName,
+      ...(ruleContent ? { ruleContent } : {}),
+      behavior: "allow"
+    }
+  }
+  return null
+}
+
+export function learnedPolicyPath(projectRoot: string): string {
+  return join(projectRoot, ".zcode", "auto-permissions.json")
+}
+
+function learnedRuleToPolicyRule(rule: LearnedRule): AutoPermissionRule {
+  const base: AutoPermissionRule = { tool: rule.tool, note: "learned from dialog" }
+  if (!rule.ruleContent) return base
+  return rule.behavior === "allow"
+    ? { ...base, pathPrefix: rule.ruleContent }
+    : { ...base, commandRegex: escapeRegExp(rule.ruleContent) }
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")
+}
+
+export function appendLearnedRule(projectRoot: string, rule: LearnedRule): string {
+  const path = learnedPolicyPath(projectRoot)
+  // The learned file is a sparse overlay: it stores only learned rules so it
+  // stays small, diffable, and does not pin stale copies of the built-ins
+  // (which the loader always layers underneath).
+  let allow: AutoPermissionRule[] = []
+  let softDeny: AutoPermissionRule[] = []
+  let hardDeny: AutoPermissionRule[] = []
+  try {
+    if (existsSync(path)) {
+      const parsed: unknown = JSON.parse(readFileSync(path, "utf8"))
+      if (isRecord(parsed)) {
+        if (Array.isArray(parsed.allow)) allow = parsed.allow as AutoPermissionRule[]
+        if (Array.isArray(parsed.softDeny)) softDeny = parsed.softDeny as AutoPermissionRule[]
+        if (Array.isArray(parsed.hardDeny)) hardDeny = parsed.hardDeny as AutoPermissionRule[]
+      }
+    }
+  } catch {
+    // Unreadable file: start from a fresh overlay rather than clobbering blindly.
+  }
+  const target = rule.behavior === "allow" ? allow : softDeny
+  const candidate = learnedRuleToPolicyRule(rule)
+  const duplicate = target.some((existing) => JSON.stringify(existing) === JSON.stringify(candidate))
+  if (!duplicate) target.push(candidate)
+  mkdirSync(dirname(path), { recursive: true })
+  writeFileSync(path, `${JSON.stringify({
+    defaults: { unmatched: existingUnmatched(path, allow, softDeny, hardDeny) },
+    allow,
+    softDeny,
+    hardDeny
+  }, null, 2)}\n`)
+  return path
+}
+
+function existingUnmatched(
+  path: string,
+  allow: AutoPermissionRule[],
+  softDeny: AutoPermissionRule[],
+  hardDeny: AutoPermissionRule[]
+): "ask" | "allow" | "deny" {
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(path, "utf8"))
+    if (isRecord(parsed) && isRecord(parsed.defaults)) {
+      const value = parsed.defaults.unmatched
+      if (value === "ask" || value === "allow" || value === "deny") return value
+    }
+  } catch {
+    // Fall through to the default below.
+  }
+  void allow
+  void softDeny
+  void hardDeny
+  return "ask"
+}
+
 
 // Auto classification is opt-in: it runs only in the client's auto overlay
 // mode, and only for ordinary tool-permission prompts. AskUserQuestion and
@@ -206,6 +326,11 @@ export function shouldAutoClassify(mode: string | undefined, toolName: string): 
   const normalized = toolName.toLowerCase().replace(/[^a-z0-9]/gu, "")
   return normalized !== "askuserquestion" && normalized !== "exitplanmode" && normalized !== "exitplanmodev2"
 }
+
+// The exact response object shape the permission dialog returns to the
+// runtime (see defaultPermissionChoices / requestToolPermission). A null
+// verdict means "no auto decision": the caller renders the human dialog.
+export type PermissionDialogResponse = { decision: "allow" | "deny"; reason: string }
 
 export function autoPermissionResponse(
   request: PermissionRequestShape,

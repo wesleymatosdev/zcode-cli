@@ -58,7 +58,9 @@ import { BackgroundTaskEventStore } from "./background-task-events.ts";
 import { readBackgroundTaskOutput } from "./background-task-output.ts";
 import { BoundedToolText, toolTextValue } from "./bounded-tool-text.ts";
 import {
+  appendLearnedRule,
   autoPermissionResponse,
+  extractLearningRule,
   loadAutoPermissionConfig,
   shouldAutoClassify
 } from "./auto-permissions.ts";
@@ -650,6 +652,7 @@ class ZCodeTui {
   private readonly editorHistory: string[] = [];
   private mode: ClientMode;
   private autoModeActive = false;
+  private readonly workspaceDirectory: string;
   private model: string;
   private tuiMode: TuiMode;
   private copyOnSelect = true;
@@ -732,6 +735,7 @@ class ZCodeTui {
     );
     this.mode = initialClientMode(options.initialMode, process.env.ZCODE_CLIENT_MODE);
     this.autoModeActive = this.mode === "auto";
+    this.workspaceDirectory = options.workspaceDirectory ?? process.cwd();
     this.model = modelLabel(options.initialModel);
     this.thoughtLevel = options.initialThoughtLevel;
     this.modelOptions = [...(options.modelOptions ?? [])];
@@ -3315,6 +3319,23 @@ class ZCodeTui {
       }
       this.updateToolView(tool, allowed ? "running" : decision === "deny" ? "rejected" : "cancelled");
     }
+    if (this.autoModeActive) {
+      // Mirror "Always allow"-style dialog answers into the project policy
+      // file so the classifier learns them for future prompts. Best-effort:
+      // a write failure must never disturb the permission flow.
+      try {
+        const learned = extractLearningRule(response);
+        if (learned) {
+          const path = appendLearnedRule(this.workspaceDirectory, learned);
+          this.addNotice(
+            `auto-permissions · learned rule (${learned.tool}${learned.ruleContent ? ` · ${learned.ruleContent}` : ""}) → ${path}`,
+            "muted"
+          );
+        }
+      } catch {
+        // ignore
+      }
+    }
     return response;
   }
 
@@ -3346,7 +3367,7 @@ class ZCodeTui {
     const autoResponse = shouldAutoClassify(this.mode, toolName)
       ? autoPermissionResponse(
         { toolName, input: request.input, riskLevel: asString(request.riskLevel) },
-        loadAutoPermissionConfig(process.env.ZCODE_AUTO_PERMISSIONS_CONFIG)
+        loadAutoPermissionConfig(process.env.ZCODE_AUTO_PERMISSIONS_CONFIG, this.workspaceDirectory)
       )
       : null;
     if (autoResponse) {
