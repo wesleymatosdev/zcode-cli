@@ -1,0 +1,23 @@
+ ✓ Write /private/tmp/zc-tmux-rw5K/probe2/hello.txt +1 -0
+       │ @@ -0,0 +1,1 @@
+     1 │+ hi
+ auto-permissions · ALLOW · Write · auto-permissions: pattern match (hello\.txt$) (Write)
+ Done — hello.txt is created in /private/tmp/zc-tmux-rw5K/probe2 containing exactly hi (2 bytes, no trailing newline).
+ › Now create a second file named other.txt containing exactly: bye
+ ◇ Thought · Ctrl+O to expand
+ ◆ Write /private/tmp/zc-tmux-rw5K/probe2/other.txt · waiting for permission
+  bye
+ Activity · 1 active tool
+  ○ Write
+Permission · Write
+Tool has side effects and requires approval
+ Risk: medium
+ ● Write /private/tmp/zc-tmux-rw5K/probe2/other.txt +1 -0
+       │ @@ -0,0 +1,1 @@
+     1 │+ bye
+Filter: type to search
+→ Allow once                      Approve only this request
+  Always allow in this project    Allow matching Write requests
+  Deny and tell ZCode why         Return feedback so the agent can adjust
+  Deny
+Type to filter · Up/Down choose · Ctrl+O details · ←/→ or PgUp/PgDn scroll · Enter confirm · Esc cancel

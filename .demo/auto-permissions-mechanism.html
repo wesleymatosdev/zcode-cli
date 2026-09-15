@@ -1,0 +1,97 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; background: transparent; color: var(--foreground, #1e1e1e); font-family: -apple-system, "Segoe UI", sans-serif; }
+  svg { width: 100%; height: auto; display: block; }
+  .t { font: 14px -apple-system, "Segoe UI", sans-serif; fill: #1e1e1e; }
+  .t.small { font-size: 12px; fill: #495057; }
+  .t.title { font-size: 18px; font-weight: 600; }
+  .t.center { text-anchor: middle; }
+  .box { rx: 10; }
+</style>
+</head>
+<body>
+<svg viewBox="0 0 820 720" xmlns="http://www.w3.org/2000/svg">
+  <text class="t title" x="20" y="28">zcode auto-permissions — the classifier between build and yolo</text>
+
+  <!-- actors -->
+  <rect x="20" y="50" width="230" height="54" rx="10" fill="#a5d8ff" stroke="#495057"/>
+  <text class="t center" x="135" y="82">You ask: create hello.txt</text>
+  <rect x="570" y="50" width="230" height="54" rx="10" fill="#a5d8ff" stroke="#495057"/>
+  <text class="t center" x="685" y="82">GLM agent proposes Write</text>
+  <line x1="250" y1="77" x2="565" y2="77" stroke="#495057" marker-end="url(#ah)"/>
+
+  <!-- TUI container -->
+  <rect x="15" y="130" width="790" height="270" rx="12" fill="none" stroke="#adb5bd" stroke-dasharray="6 5"/>
+  <text class="t small" x="30" y="150">ZCode TUI — open source (where this PR lives)</text>
+
+  <!-- seam -->
+  <rect x="290" y="165" width="240" height="46" rx="10" fill="#c3fae8" stroke="#495057"/>
+  <text class="t center" x="410" y="193">requestToolPermission()</text>
+  <line x1="685" y1="104" x2="535" y2="168" stroke="#495057" marker-end="url(#ah)"/>
+
+  <!-- gate -->
+  <polygon points="105,255 195,255 240,320 105,320 60,320" fill="#fff3bf" stroke="#495057"/>
+  <polygon points="100,252 190,252 230,312 60,312" fill="#fff3bf" stroke="#495057"/>
+  <text class="t center" x="145" y="287">auto overlay on?</text>
+  <text class="t small center" x="145" y="305">(client mode)</text>
+  <line x1="330" y1="211" x2="180" y2="255" stroke="#495057" marker-end="url(#ah)"/>
+
+  <!-- classifier -->
+  <rect x="300" y="255" width="310" height="120" rx="10" fill="#d0bfff" stroke="#495057"/>
+  <text class="t center" x="455" y="278" font-weight="600">classifier — policy eval</text>
+  <text class="t small center" x="455" y="300">allow: git status·ls·Read·Grep…</text>
+  <text class="t small center" x="455" y="320">deny: rm -rf·sudo·curl|sh·.env secrets</text>
+  <text class="t small center" x="455" y="340">unmatched → ask (defaults.unmatched)</text>
+  <text class="t small center" x="455" y="362">policy: ZCODE_AUTO_PERMISSIONS_CONFIG</text>
+  <line x1="250" y1="290" x2="295" y2="295" stroke="#495057" marker-end="url(#ah)"/>
+  <text class="t small" x="258" y="280">yes</text>
+
+  <!-- human dialog -->
+  <rect x="40" y="400" width="220" height="70" rx="10" fill="#ffd8a8" stroke="#495057"/>
+  <text class="t center" x="150" y="428">human dialog (unchanged)</text>
+  <text class="t small center" x="150" y="448">Allow once · Always allow · Deny</text>
+  <line x1="120" y1="315" x2="130" y2="395" stroke="#495057" marker-end="url(#ah)"/>
+  <text class="t small" x="88" y="360">no</text>
+
+  <!-- unmatched arrow from classifier down-left to dialog -->
+  <path d="M 330 375 C 300 395 240 385 185 398" fill="none" stroke="#495057" marker-end="url(#ah)"/>
+  <text class="t small" x="228" y="385">unmatched</text>
+
+  <!-- outcomes -->
+  <rect x="320" y="400" width="130" height="54" rx="10" fill="#b2f2bb" stroke="#495057"/>
+  <text class="t center" x="385" y="432">ALLOW → runs</text>
+  <rect x="480" y="400" width="130" height="54" rx="10" fill="#ffc9c9" stroke="#495057"/>
+  <text class="t center" x="545" y="432">DENY → blocked</text>
+  <line x1="420" y1="375" x2="385" y2="398" stroke="#495057" marker-end="url(#ah)"/>
+  <line x1="510" y1="375" x2="540" y2="398" stroke="#495057" marker-end="url(#ah)"/>
+  <text class="t small" x="430" y="393">every decision printed as a transcript notice</text>
+
+  <!-- runtime -->
+  <rect x="15" y="500" width="790" height="86" rx="12" fill="none" stroke="#adb5bd" stroke-dasharray="6 5"/>
+  <text class="t small" x="30" y="520">ZCode runtime — closed (engine · modes enum · tools)</text>
+  <rect x="60" y="530" width="200" height="44" rx="10" fill="#b2f2bb" stroke="#495057"/>
+  <text class="t center" x="160" y="557">tool runs · file written</text>
+  <rect x="480" y="530" width="230" height="44" rx="10" fill="#ffc9c9" stroke="#495057"/>
+  <text class="t center" x="595" y="557">tool blocked · reason fed back</text>
+  <line x1="385" y1="454" x2="200" y2="528" stroke="#495057" marker-end="url(#ah)"/>
+  <line x1="560" y1="454" x2="580" y2="528" stroke="#495057" marker-end="url(#ah)"/>
+
+  <!-- artifact proof -->
+  <text class="t" x="20" y="620" fill="#2f9e44">artifact proof: hello.txt ("hi") written to disk — no dialog was ever rendered for the covered write</text>
+
+  <!-- notes -->
+  <text class="t small" x="20" y="652">modes: Shift+Tab or /mode → build · edit · auto · yolo · plan   (auto = client overlay, runtime pinned to build)</text>
+  <text class="t small" x="20" y="676">boot headless: ZCODE_CLIENT_MODE=auto   ·   policy file: ZCODE_AUTO_PERMISSIONS_CONFIG (allow / softDeny / hardDeny)</text>
+  <text class="t small" x="20" y="700">safety: classification only runs where a prompt would have shown — it can never widen yolo or override runtime denies</text>
+
+  <defs>
+    <marker id="ah" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+      <polygon points="0 0, 9 3.5, 0 7" fill="#495057"/>
+    </marker>
+  </defs>
+</svg>
+</body>
+</html>

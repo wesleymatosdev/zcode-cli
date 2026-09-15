@@ -1,0 +1,20 @@
+{
+  "cols": 80,
+  "lines": [
+    "\u001b[38;5;247m────────────────────────────────────────────────────────────────────────────────\u001b[0m",
+    "  \u001b[1;38;5;252mPermission · bash\u001b[0m                                                             ",
+    "  \u001b[38;5;247mbash requests permission to continue.\u001b[0m                                         ",
+    "                                                                                ",
+    "  \u001b[38;5;252;48;5;236m \u001b[1;38;5;252mrm -rf node_modules/.cache\u001b[0m\u001b[38;5;252;48;5;236m                                                 \u001b[0m  ",
+    "  \u001b[38;5;252;48;5;236m \u001b[38;5;247mRisk: high · destructive\u001b[0m\u001b[38;5;252;48;5;236m                                                   \u001b[0m  ",
+    "  \u001b[38;5;247mFilter:\u001b[0m \u001b[38;5;247mtype to search\u001b[0m                                                        ",
+    "                                                                                ",
+    "  \u001b[1;38;5;252m\u001b[38;5;75m→ 1. Allow once                   Approve only this request\u001b[0m\u001b[1;38;5;252m\u001b[0m                   ",
+    "    2. Always allow in this projec\u001b[0m\u001b[38;5;247m  Allow matching bash requests\u001b[0m                ",
+    "    3. Deny\u001b[38;5;247m                         Reject this request\u001b[0m                         ",
+    "                                                                                ",
+    "  \u001b[38;5;247mType to filter · number selects · Up/Down choose · Ctrl+O details · ←/→ or    ",
+    "  \u001b[38;5;247mPgUp/PgDn scroll · Enter confirm · Esc cancel\u001b[0m                                 ",
+    "\u001b[38;5;247m────────────────────────────────────────────────────────────────────────────────\u001b[0m"
+  ]
+}
